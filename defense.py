@@ -90,7 +90,7 @@ def model_preprocess(df):
 
 # Function to Train the ASR Model
 ## Input- Prprocessed DataFrame from model_preprocess function, Team Names, StandardScaler object
-@st.cache_resource
+#@st.cache_resource
 def train_asr_model(model_df, team_names, SC):
     best_score = -1
     best_model = None

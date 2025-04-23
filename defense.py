@@ -90,13 +90,14 @@ def model_preprocess(df):
 # Function to Train the ASR Model
 ## Input- Prprocessed DataFrame from model_preprocess function, Team Names, StandardScaler object
 def asr_model(model_df, team_names, SC, df):
-    param_grid = {'C': [1/0.01, 1/0.1, 1/1, 1/10, 1/100]}  
+    #param_grid = {'C': [1/0.01, 1/0.1, 1/1, 1/10, 1/100]}  
 
-    lr_model = LogisticRegression(penalty='l2', solver='newton-cg')
-    grid_search = GridSearchCV(lr_model, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
-    grid_search.fit(model_df.drop('drive_result', axis=1), model_df['drive_result'])
+    lr_model = LogisticRegression(penalty='l2', solver='liblinear')
+    #grid_search = GridSearchCV(lr_model, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
+    #grid_search.fit(model_df.drop('drive_result', axis=1), model_df['drive_result'])
 
-    best_model = grid_search.best_estimator_
+    #best_model = grid_search.best_estimator_
+    best_model=lr_model
 
     # Loading Saved Model
     #best_model = pickle.load(open("lr_model.pkl", "rb"))

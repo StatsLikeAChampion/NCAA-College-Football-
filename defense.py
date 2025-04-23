@@ -7,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV
 import numpy as np
+import time
 
 @st.cache_data(show_spinner="Fetching and preprocessing data...")
 def load_and_preprocess_data(year, week):
@@ -331,10 +332,6 @@ You’ll find key metrics like:
 
         # Train button
         if st.button("Train Logistic Ridge Regression Model", key="train_button"):
-            info_placeholder = st.empty()
-            info_placeholder.info("Training the model and computing ASR... this may take a few seconds.")
-
-            
             progress = st.progress(0, text="Starting ASR Model Training...")
 
             df = st.session_state['drive_data']

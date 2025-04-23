@@ -89,14 +89,14 @@ def model_preprocess(df):
 # Function to Train the ASR Model
 ## Input- Prprocessed DataFrame from model_preprocess function, Team Names, StandardScaler object
 def asr_model(model_df, team_names, SC, df):
-    param_grid = {'C': [1/0.01, 1/0.1, 1/10]}  
+    param_grid = {'C': [1/0.01, 1/0.1]}  
 
     lr_model = LogisticRegression(penalty='l2', solver='newton-cg')
-    #grid_search = GridSearchCV(lr_model, param_grid, cv=5, scoring='accuracy', n_jobs=1)
-    #grid_search.fit(model_df.drop('drive_result', axis=1), model_df['drive_result'])
+    grid_search = GridSearchCV(lr_model, param_grid, cv=2, scoring='accuracy', n_jobs=1)
+    grid_search.fit(model_df.drop('drive_result', axis=1), model_df['drive_result'])
 
-    #best_model = grid_search.best_estimator_
-    best_model=lr_model
+    best_model = grid_search.best_estimator_
+    #best_model=lr_model
     # === Generate Synthetic Test Set ===
     test_data = [
         {"offense": i, "defense": j, "start_yards_to_goal": k}
@@ -334,15 +334,29 @@ You’ll find key metrics like:
             info_placeholder = st.empty()
             info_placeholder.info("Training the model and computing ASR... this may take a few seconds.")
 
+            
+            progress = st.progress(0, text="Starting ASR Model Training...")
+
             df = st.session_state['drive_data']
             team_names = df['defense'].unique()
-
+            
+            # Step 1: Preprocess
+            progress.progress(10, text="Preprocessing data...")
             model_df, SC = model_preprocess(df)
-            asr_df = asr_model(model_df, team_names, SC,df)
-             # Filter out teams with less than 30 stops
+            time.sleep(0.5)
+            
+            # Step 2: Train model
+            progress.progress(50, text="Training model...")
+            asr_df = asr_model(model_df, team_names, SC, df)
+            time.sleep(0.5)
+            
+            # Step 3: Filter & Save
+            progress.progress(80, text="Postprocessing results...")
             asr_df = asr_df[asr_df['Stops'] > 30]
-
             st.session_state['asr_df'] = asr_df
+            
+            progress.progress(100, text="✅ Done! ASR Model Trained Successfully")
+
             info_placeholder.empty()
 
         # Display ASR table only if model is trained

@@ -31,7 +31,7 @@ def load_and_preprocess_data(year, week):
         df['drive_result'] = df['drive_result'].apply(lambda x: 'Not Defended' if x in ['TD', 'FG'] else 'Defended')
         df['score_diff'] = (df['end_offense_score'] - df['start_offense_score']) - (df['end_defense_score'] - df['start_defense_score'])
         df['score_diff'] = df['score_diff'].shift(1)
-        df['score_diff'].fillna(0, inplace=True)
+        df['score_diff'] = df['score_diff'].fillna(0)
         df = df[~((df['start_period'] == 4) & (df['score_diff'] > 24))]
 
     return df
@@ -71,7 +71,7 @@ def compute_weekly_stop_rate(df, teams, selected_week):
 # Output- Preprocessed DataFrame, StandardScaler object
 
 def model_preprocess(df):
-    model_df=df[['offense','defense','start_yards_to_goal','drive_result']]
+    model_df = df[['offense','defense','start_yards_to_goal','drive_result']].copy()
     LE1=LabelEncoder()
     model_df['drive_result']=LE1.fit_transform(model_df['drive_result'])
     model_df['offense'] = model_df['offense'].astype(str)

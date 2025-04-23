@@ -90,15 +90,14 @@ def model_preprocess(df):
 
 # Function to Train the ASR Model
 ## Input- Prprocessed DataFrame from model_preprocess function, Team Names, StandardScaler object
-def asr_model(model_df, team_names, SC, df):
-    # === Manual Grid Search ===
-    param_grid = {'C': [1, 0.1, 0.01]}
+@st.cache_resource
+def train_asr_model(model_df, team_names, SC):
     best_score = -1
     best_model = None
     X = model_df.drop('drive_result', axis=1)
     y = model_df['drive_result']
 
-    for C in param_grid['C']:
+    for C in [1, 0.1, 0.01]:
         model = LogisticRegression(C=C, penalty='l2', solver='newton-cg', max_iter=500)
         scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
         avg_score = scores.mean()
@@ -108,49 +107,27 @@ def asr_model(model_df, team_names, SC, df):
 
     best_model.fit(X, y)
 
-    # === Synthetic Test Set Generation ===
+    # Synthetic Test Set
     test_data = [
         {"offense": i, "defense": j, "start_yards_to_goal": k}
         for i in team_names for j in team_names for k in range(10, 100, 10)
     ]
     test_df = pd.DataFrame(test_data)
-
     encoded_offense = pd.get_dummies(test_df['offense'], prefix='offense', dtype=int)
     encoded_defense = pd.get_dummies(test_df['defense'], prefix='defense', dtype=int)
     test_df = pd.concat([test_df, encoded_offense, encoded_defense], axis=1)
 
     raw_yards = test_df['start_yards_to_goal'].copy()
     test_df[['start_yards_to_goal']] = SC.transform(test_df[['start_yards_to_goal']])
-
     X_test = test_df.drop(columns=['offense', 'defense'], errors='ignore')
     y_pred = best_model.predict_proba(X_test)[:, 1]
     test_df['predicted_prob'] = 1 - y_pred
     test_df['Yards to Goal'] = raw_yards
-    # === Generate Synthetic Test Set ===
-    test_data = [
-        {"offense": i, "defense": j, "start_yards_to_goal": k}
-        for i in team_names for j in team_names for k in range(5, 100, 5)
-    ]
-    test_df = pd.DataFrame(test_data)
 
-    # Encode
-    encoded_offense = pd.get_dummies(test_df['offense'], prefix='offense', dtype=int)
-    encoded_defense = pd.get_dummies(test_df['defense'], prefix='defense', dtype=int)
-    test_df = pd.concat([test_df, encoded_offense, encoded_defense], axis=1)
+    return test_df
 
-    raw_yards = test_df['start_yards_to_goal'].copy()
-
-    # Scale for prediction
-    test_df[['start_yards_to_goal']] = SC.transform(test_df[['start_yards_to_goal']])
-
-    # Predict
-    X_test = test_df.drop(columns=['offense', 'defense'], errors='ignore')
-    y_pred = best_model.predict_proba(X_test)[:, 1]
-    test_df['predicted_prob'] = 1 - y_pred
-
-    test_df['Yards to Goal'] = raw_yards
-
-    # === Compute Bin Distribution from Original Data ===
+def compute_asr(test_df, df, team_names):
+    # Bin distribution from original data
     bins = np.arange(0, 110, 10)
     labels = [f"{i}-{i+10}" for i in bins[:-1]]
     counts = pd.cut(df['start_yards_to_goal'], bins=bins, labels=labels, right=False).value_counts().sort_index()
@@ -159,7 +136,6 @@ def asr_model(model_df, team_names, SC, df):
     distribution_df.columns = ['start_yards_to_goal', 'count']
     distribution_df['start'] = distribution_df['start_yards_to_goal'].str.split('-').str[0].astype(int)
     distribution_df['end'] = distribution_df['start_yards_to_goal'].str.split('-').str[1].astype(int)
-
     final_bins = [0] + distribution_df['end'].tolist()
     final_labels = distribution_df['count'].tolist()
 
@@ -172,7 +148,6 @@ def asr_model(model_df, team_names, SC, df):
     )
     test_df['count'] = pd.to_numeric(test_df['count'], errors='coerce')
 
-    # === Compute ASR & Weighted ASR ===
     asr_dict = {}
     weighted_asr_dict = {}
 
@@ -180,7 +155,6 @@ def asr_model(model_df, team_names, SC, df):
         team_data = test_df[test_df['defense'] == defense_team]
         probs = team_data['predicted_prob'].values
         counts = team_data['count'].values
-
         asr_value = probs.mean() * 100
         weighted_asr = (probs * counts).sum() / counts.sum() * 100 if counts.sum() > 0 else 0
 
@@ -192,11 +166,6 @@ def asr_model(model_df, team_names, SC, df):
         'ASR%': list(asr_dict.values()),
         'Weighted ASR%': list(weighted_asr_dict.values())
     })
-
-    stop_data = stoprate(df, team_names)[['defense', 'Stops']]
-    asr_df = asr_df.merge(stop_data, on='defense', how='left')
-    asr_df.sort_values(by='ASR%', ascending=False, inplace=True)
-
     return asr_df
 
 
@@ -368,12 +337,13 @@ You’ll find key metrics like:
             # Step 1: Preprocess
             progress.progress(10, text="Preprocessing data...")
             model_df, SC = model_preprocess(df)
-            time.sleep(0.5)
+            time.sleep(1)
             
             # Step 2: Train model
             progress.progress(50, text="Training model...")
-            asr_df = asr_model(model_df, team_names, SC, df)
-            time.sleep(0.5)
+            test_df = train_asr_model(model_df, team_names, SC)  # Step 1
+            asr_df = compute_asr(test_df, df, team_names)        # Step 2
+            time.sleep(1)
             
             # Step 3: Filter & Save
             progress.progress(80, text="Postprocessing results...")

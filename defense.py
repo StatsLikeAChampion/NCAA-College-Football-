@@ -434,38 +434,38 @@ You’ll find key metrics like:
 
             st.markdown("### Numerical Correlation")
             st.table(stoprate_combined[['Stop Rate Week 8','Stop Rate Week 15']].corr().style.background_gradient(cmap='grey'))  
-        elif choice=='Train ASR (VS) Test SR':
-            df = load_and_preprocess_data(year, 15)
-            train_df = df[df['week'] < 9]
-            test_df = df[df['week'] >= 9]
-            st.markdown(f"### Train ASR vs Test Stop Rate Comparison ({year} Season)")
+        # elif choice=='Train ASR (VS) Test SR':
+        #     df = load_and_preprocess_data(year, 15)
+        #     train_df = df[df['week'] < 9]
+        #     test_df = df[df['week'] >= 9]
+        #     st.markdown(f"### Train ASR vs Test Stop Rate Comparison ({year} Season)")
 
-            team_names = list(train_df['defense'].unique())
+        #     team_names = list(train_df['defense'].unique())
 
-            # Train: Compute ASR
-            train_model_df, SC = model_preprocess(train_df)
-            asr_df = asr_model(train_model_df, team_names, SC, train_df)
-            asr_df = asr_df.rename(columns={'Weighted ASR%': 'Weighted ASR Week 8'})
+        #     # Train: Compute ASR
+        #     train_model_df, SC = model_preprocess(train_df)
+        #     asr_df = asr_model(train_model_df, team_names, SC, train_df)
+        #     asr_df = asr_df.rename(columns={'Weighted ASR%': 'Weighted ASR Week 8'})
 
-            # Test: Compute Stop Rate
-            stop_rate_df = stoprate(test_df, team_names)
-            stop_rate_df = stop_rate_df[stop_rate_df['Stops'] > 30]
-            stop_rate_df = stop_rate_df[['defense', 'Stop Rate%']].rename(columns={'Stop Rate%': 'Stop Rate Week 15'})
+        #     # Test: Compute Stop Rate
+        #     stop_rate_df = stoprate(test_df, team_names)
+        #     stop_rate_df = stop_rate_df[stop_rate_df['Stops'] > 30]
+        #     stop_rate_df = stop_rate_df[['defense', 'Stop Rate%']].rename(columns={'Stop Rate%': 'Stop Rate Week 15'})
 
-            # Filter ASR to only include teams in test stop rate
-            asr_df = asr_df[asr_df['defense'].isin(stop_rate_df['defense'])]
+        #     # Filter ASR to only include teams in test stop rate
+        #     asr_df = asr_df[asr_df['defense'].isin(stop_rate_df['defense'])]
 
-            # Merge for plotting
-            combined_df = pd.merge(asr_df, stop_rate_df, on='defense', how='inner')
+        #     # Merge for plotting
+        #     combined_df = pd.merge(asr_df, stop_rate_df, on='defense', how='inner')
 
-            fig = plt.figure(figsize=(12, 6))
-            plt.scatter(combined_df['Weighted ASR Week 8'], combined_df['Stop Rate Week 15'], color='purple', label='ASR vs Stop Rate')
-            plt.xlabel("Train WASR")
-            plt.ylabel("Test SR")
-            plt.title("Train WASR vs Test Stop Rate Comparison")
-            st.pyplot(fig)
-            st.markdown("### Numerical Correlation")
-            st.table(combined_df[['Weighted ASR Week 8','Stop Rate Week 15']].corr().style.background_gradient(cmap='grey'))
+        #     fig = plt.figure(figsize=(12, 6))
+        #     plt.scatter(combined_df['Weighted ASR Week 8'], combined_df['Stop Rate Week 15'], color='purple', label='ASR vs Stop Rate')
+        #     plt.xlabel("Train WASR")
+        #     plt.ylabel("Test SR")
+        #     plt.title("Train WASR vs Test Stop Rate Comparison")
+        #     st.pyplot(fig)
+        #     st.markdown("### Numerical Correlation")
+        #     st.table(combined_df[['Weighted ASR Week 8','Stop Rate Week 15']].corr().style.background_gradient(cmap='grey'))
 
 
 

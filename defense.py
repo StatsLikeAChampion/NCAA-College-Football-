@@ -71,61 +71,58 @@ def compute_weekly_stop_rate(df, teams, selected_week):
 # Input-Data Frame
 # Output- Preprocessed DataFrame, StandardScaler object
 
-def model_preprocess(df):
-    model_df = df[['offense','defense','start_yards_to_goal','drive_result']].copy()
-    LE1=LabelEncoder()
-    model_df['drive_result']=LE1.fit_transform(model_df['drive_result'])
-    model_df['offense'] = model_df['offense'].astype(str)
-    model_df['defense'] = model_df['defense'].astype(str)
-    encoded_offense = pd.get_dummies(model_df['offense'], prefix='offense', dtype=int)
-    encoded_defense = pd.get_dummies(model_df['defense'], prefix='defense', dtype=int)
-    model_df = pd.concat([model_df, encoded_offense, encoded_defense], axis=1)
-    model_df = model_df.drop(columns=['offense', 'defense'])
-    SC=StandardScaler()
-    model_df[['start_yards_to_goal']] = SC.fit_transform(model_df[['start_yards_to_goal']])
+# def model_preprocess(df):
+#     model_df = df[['offense','defense','start_yards_to_goal','drive_result']].copy()
+#     LE1=LabelEncoder()
+#     model_df['drive_result']=LE1.fit_transform(model_df['drive_result'])
+#     model_df['offense'] = model_df['offense'].astype(str)
+#     model_df['defense'] = model_df['defense'].astype(str)
+#     encoded_offense = pd.get_dummies(model_df['offense'], prefix='offense', dtype=int)
+#     encoded_defense = pd.get_dummies(model_df['defense'], prefix='defense', dtype=int)
+#     model_df = pd.concat([model_df, encoded_offense, encoded_defense], axis=1)
+#     model_df = model_df.drop(columns=['offense', 'defense'])
+#     SC=StandardScaler()
+#     model_df[['start_yards_to_goal']] = SC.fit_transform(model_df[['start_yards_to_goal']])
 
-    return model_df,SC
+#     return model_df,SC
     
 
 # Function to Train the ASR Model
 ## Input- Prprocessed DataFrame from model_preprocess function, Team Names, StandardScaler object
-def asr_model(model_df, team_names, SC, df):
-    #param_grid = {'C': [1/0.01, 1/0.1, 1/1, 1/10, 1/100]}  
+def asr_model(team_names, df):
+    # Load pre-trained model and components
+    with open('asr_model.pkl', 'rb') as f:
+        model, scaler, feature_columns = pickle.load(f)
 
-    lr_model = LogisticRegression(penalty='l2', solver='liblinear')
-    #grid_search = GridSearchCV(lr_model, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
-    #grid_search.fit(model_df.drop('drive_result', axis=1), model_df['drive_result'])
-
-    #best_model = grid_search.best_estimator_
-    best_model=lr_model
-
-    # Loading Saved Model
-    #best_model = pickle.load(open("lr_model.pkl", "rb"))
-    # === Generate Synthetic Test Set ===
+    # Generate synthetic test data
     test_data = [
         {"offense": i, "defense": j, "start_yards_to_goal": k}
         for i in team_names for j in team_names for k in range(5, 100, 5)
     ]
     test_df = pd.DataFrame(test_data)
 
-    # Encode
+    # Encode offense and defense
+    test_df['offense'] = test_df['offense'].astype(str)
+    test_df['defense'] = test_df['defense'].astype(str)
     encoded_offense = pd.get_dummies(test_df['offense'], prefix='offense', dtype=int)
     encoded_defense = pd.get_dummies(test_df['defense'], prefix='defense', dtype=int)
     test_df = pd.concat([test_df, encoded_offense, encoded_defense], axis=1)
 
-    raw_yards = test_df['start_yards_to_goal'].copy()
+    # Scale start_yards_to_goal
+    test_df[['start_yards_to_goal']] = scaler.transform(test_df[['start_yards_to_goal']])
 
-    # Scale for prediction
-    test_df[['start_yards_to_goal']] = SC.transform(test_df[['start_yards_to_goal']])
+    # Align features with model input
+    for col in feature_columns:
+        if col not in test_df:
+            test_df[col] = 0  # add missing columns
+    test_df = test_df[feature_columns]
 
-    # Predict
-    X_test = test_df.drop(columns=['offense', 'defense'], errors='ignore')
-    y_pred = best_model.predict_proba(X_test)[:, 1]
-    test_df['predicted_prob'] = 1 - y_pred
+    # Predict probabilities
+    y_pred = model.predict_proba(test_df)[:, 1]
+    test_df['predicted_prob'] = 1 - y_pred  # probability of "Defended"
+    test_df['Yards to Goal'] = [d["start_yards_to_goal"] for d in test_data]
 
-    test_df['Yards to Goal'] = raw_yards
-
-    # === Compute Bin Distribution from Original Data ===
+    # Bin distributions from real data
     bins = np.arange(0, 110, 10)
     labels = [f"{i}-{i+10}" for i in bins[:-1]]
     counts = pd.cut(df['start_yards_to_goal'], bins=bins, labels=labels, right=False).value_counts().sort_index()
@@ -147,20 +144,21 @@ def asr_model(model_df, team_names, SC, df):
     )
     test_df['count'] = pd.to_numeric(test_df['count'], errors='coerce')
 
-    # === Compute ASR & Weighted ASR ===
+    # Compute ASR and Weighted ASR
     asr_dict = {}
     weighted_asr_dict = {}
 
     for defense_team in team_names:
-        team_data = test_df[test_df['defense'] == defense_team]
-        probs = team_data['predicted_prob'].values
-        counts = team_data['count'].values
-
-        asr_value = probs.mean() * 100
-        weighted_asr = (probs * counts).sum() / counts.sum() * 100 if counts.sum() > 0 else 0
-
-        asr_dict[defense_team] = round(asr_value, 2)
-        weighted_asr_dict[defense_team] = round(weighted_asr, 2)
+        team_data = test_df[test_df['defense_' + defense_team] == 1] if f'defense_{defense_team}' in test_df else pd.DataFrame()
+        if not team_data.empty:
+            probs = team_data['predicted_prob'].values
+            counts = team_data['count'].values
+            asr = probs.mean() * 100
+            wasr = (probs * counts).sum() / counts.sum() * 100 if counts.sum() > 0 else 0
+        else:
+            asr, wasr = 0, 0
+        asr_dict[defense_team] = round(asr, 2)
+        weighted_asr_dict[defense_team] = round(wasr, 2)
 
     asr_df = pd.DataFrame({
         'defense': list(asr_dict.keys()),
@@ -173,6 +171,7 @@ def asr_model(model_df, team_names, SC, df):
     asr_df.sort_values(by='ASR%', ascending=False, inplace=True)
 
     return asr_df
+
 
 
 
@@ -341,8 +340,8 @@ You’ll find key metrics like:
             df = st.session_state['drive_data']
             team_names = df['defense'].unique()
 
-            model_df, SC = model_preprocess(df)
-            asr_df = asr_model(model_df, team_names, SC,df)
+            # model_df, SC = model_preprocess(df)
+            asr_df = asr_model(team_names,df)
              # Filter out teams with less than 30 stops
             asr_df = asr_df[asr_df['Stops'] > 30]
 

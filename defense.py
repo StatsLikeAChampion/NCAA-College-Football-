@@ -270,7 +270,7 @@ You’ll find key metrics like:
 
                 
         st.markdown("### Select Comparison Type: ")
-        option_button=st.radio("",('Overall Stop Rate','Weekly Stop Rate'),index=0,horizontal=True)
+        option_button=st.radio("Please Select:",('Overall Stop Rate','Weekly Stop Rate'),index=0,horizontal=True)
 
         if option_button=='Weekly Stop Rate':
                 
@@ -405,7 +405,7 @@ You’ll find key metrics like:
 
             st.pyplot(fig)
     with tab4:
-        choice=st.radio("",('Train (VS) Test Stop Rate','Train ASR (VS) Test SR'),index=0,horizontal=True)
+        choice=st.radio("Please Select:",('Train (VS) Test Stop Rate','Train ASR (VS) Test SR'),index=0,horizontal=True)
         if choice=='Train (VS) Test Stop Rate':
             df=load_and_preprocess_data(year, 15)
             train_df=df[df['week']<9]

@@ -92,10 +92,11 @@ def asr_model(model_df, team_names, SC, df):
     param_grid = {'C': [1/0.01, 1/0.1, 1/10]}  
 
     lr_model = LogisticRegression(penalty='l2', solver='newton-cg')
-    grid_search = GridSearchCV(lr_model, param_grid, cv=5, scoring='accuracy', n_jobs=1)
-    grid_search.fit(model_df.drop('drive_result', axis=1), model_df['drive_result'])
+    #grid_search = GridSearchCV(lr_model, param_grid, cv=5, scoring='accuracy', n_jobs=1)
+    #grid_search.fit(model_df.drop('drive_result', axis=1), model_df['drive_result'])
 
-    best_model = grid_search.best_estimator_
+    #best_model = grid_search.best_estimator_
+    best_model=lr_model
     # === Generate Synthetic Test Set ===
     test_data = [
         {"offense": i, "defense": j, "start_yards_to_goal": k}

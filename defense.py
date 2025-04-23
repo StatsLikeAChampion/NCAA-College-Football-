@@ -8,6 +8,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV
 import numpy as np
 import time
+from sklearn.model_selection import cross_val_score
 
 @st.cache_data(show_spinner="Fetching and preprocessing data...")
 def load_and_preprocess_data(year, week):

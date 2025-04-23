@@ -90,14 +90,41 @@ def model_preprocess(df):
 # Function to Train the ASR Model
 ## Input- Prprocessed DataFrame from model_preprocess function, Team Names, StandardScaler object
 def asr_model(model_df, team_names, SC, df):
-    param_grid = {'C': [1/0.01, 1/0.1]}  
+    # === Manual Grid Search ===
+    param_grid = {'C': [1, 0.1, 0.01]}
+    best_score = -1
+    best_model = None
+    X = model_df.drop('drive_result', axis=1)
+    y = model_df['drive_result']
 
-    lr_model = LogisticRegression(penalty='l2', solver='newton-cg')
-    grid_search = GridSearchCV(lr_model, param_grid, cv=2, scoring='accuracy', n_jobs=1)
-    grid_search.fit(model_df.drop('drive_result', axis=1), model_df['drive_result'])
+    for C in param_grid['C']:
+        model = LogisticRegression(C=C, penalty='l2', solver='newton-cg', max_iter=500)
+        scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+        avg_score = scores.mean()
+        if avg_score > best_score:
+            best_score = avg_score
+            best_model = model
 
-    best_model = grid_search.best_estimator_
-    #best_model=lr_model
+    best_model.fit(X, y)
+
+    # === Synthetic Test Set Generation ===
+    test_data = [
+        {"offense": i, "defense": j, "start_yards_to_goal": k}
+        for i in team_names for j in team_names for k in range(10, 100, 10)
+    ]
+    test_df = pd.DataFrame(test_data)
+
+    encoded_offense = pd.get_dummies(test_df['offense'], prefix='offense', dtype=int)
+    encoded_defense = pd.get_dummies(test_df['defense'], prefix='defense', dtype=int)
+    test_df = pd.concat([test_df, encoded_offense, encoded_defense], axis=1)
+
+    raw_yards = test_df['start_yards_to_goal'].copy()
+    test_df[['start_yards_to_goal']] = SC.transform(test_df[['start_yards_to_goal']])
+
+    X_test = test_df.drop(columns=['offense', 'defense'], errors='ignore')
+    y_pred = best_model.predict_proba(X_test)[:, 1]
+    test_df['predicted_prob'] = 1 - y_pred
+    test_df['Yards to Goal'] = raw_yards
     # === Generate Synthetic Test Set ===
     test_data = [
         {"offense": i, "defense": j, "start_yards_to_goal": k}

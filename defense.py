@@ -66,7 +66,7 @@ def compute_weekly_stop_rate(df, teams, selected_week):
             weekly_data['week'].append(wk)
             weekly_data['Stop Rate%'].append(rate)
     return pd.DataFrame(weekly_data)
-
+    
 def model_preprocess(df):
     model_df = df[['offense','defense','start_yards_to_goal','drive_result']].copy()
     LE1=LabelEncoder()
@@ -79,10 +79,22 @@ def model_preprocess(df):
     model_df = model_df.drop(columns=['offense', 'defense'])
     SC=StandardScaler()
     model_df[['start_yards_to_goal']] = SC.fit_transform(model_df[['start_yards_to_goal']])
-    return model_df, SC
+    
+    # Return scaler parameters instead of the object
+    scaler_params = {
+        'mean': SC.mean_,
+        'scale': SC.scale_
+    }
+    return model_df, scaler_params
 
 @st.cache_resource
-def train_asr_model(model_df, team_names, SC):
+def train_asr_model(model_df, team_names, _scaler_params):
+    # Recreate the scaler from params instead of passing the object
+    SC = StandardScaler()
+    SC.mean_ = _scaler_params['mean']
+    SC.scale_ = _scaler_params['scale']
+    
+    # Rest of your function remains the same
     best_score = -1
     best_model = None
     X = model_df.drop('drive_result', axis=1)
